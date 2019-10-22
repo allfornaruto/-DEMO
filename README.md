@@ -38,6 +38,9 @@
     |--config
     |       |--index.js         //提供参数a:1 b:2
     |
+    |-----db
+    |       |--db.js            //模拟aws数据库存储
+    |
     |--utils
     |       |--Number.js        //提供了add函数
     |
@@ -52,6 +55,9 @@
 201910
     |--config
     |       |--index.js         //修改了参数a:10 b:20
+    |
+    |-----db
+    |       |--db.js            //模拟aws数据库存储
     |
     |--utils
     |       |--Number.js        //新增minus函数、multiply函数、divide函数
@@ -92,7 +98,48 @@
            path.insertAfter(ast);
        }
      }
-
+  // old src/transform/db/db.js
+  FunctionDeclaration(path) {
+      if (t.isIdentifier(path.node.id, { name: "savedb" })) {
+        const blockStatements = path.node.body.body;
+        // var s3 = new s3(); -> var ood = new aliyun();
+        const s3toaliyun = blockStatements.filter((item) => {
+          let isVariableDeclaration = t.isVariableDeclaration(item);
+          let isTargetIdentifier = isVariableDeclaration && t.isIdentifier(item.declarations[0].id, { name: "s3" });
+          return isTargetIdentifier;
+        });
+        s3toaliyun[0].declarations[0].id.name = "ood";
+        s3toaliyun[0].declarations[0].init.callee.name = "aliyun";
+        // return s3.save(data); -> return ood.addOrUpdate(data);
+        const save2addOrUpdate = blockStatements.filter((item) => {
+          let isReturnStatement = t.isReturnStatement(item);
+          return isReturnStatement;
+        });
+        save2addOrUpdate[0].argument.callee.object.name = "ood";
+        save2addOrUpdate[0].argument.callee.property.name = "addOrUpdate";
+      }
+    }
+  // new src/transform/db/db.js
+  FunctionDeclaration(path) {
+      if (t.isIdentifier(path.node.id, { name: "savedbv2" })) {
+        const blockStatements = path.node.body.body;
+        // var s3 = new s3(); -> var ood = new aliyun();
+        const s3toaliyun = blockStatements.filter((item) => {
+          let isVariableDeclaration = t.isVariableDeclaration(item);
+          let isTargetIdentifier = isVariableDeclaration && t.isIdentifier(item.declarations[0].id, { name: "s3" });
+          return isTargetIdentifier;
+        });
+        s3toaliyun[0].declarations[0].id.name = "ood";
+        s3toaliyun[0].declarations[0].init.callee.name = "aliyun";
+        // return s3.save(data); -> return ood.addOrUpdate(data);
+        const save2addOrUpdate = blockStatements.filter((item) => {
+          let isReturnStatement = t.isReturnStatement(item);
+          return isReturnStatement;
+        });
+        save2addOrUpdate[0].argument.callee.object.name = "ood";
+        save2addOrUpdate[0].argument.callee.property.name = "addOrUpdate";
+      }
+    }
 ```
 
 ```javascript
@@ -119,6 +166,22 @@ const correct=`
   console.log("multiplyResult=",multiplyResult);
   console.log("divideResult=",divideResult);
 `;
+// old test/transformTest/db/db.test.js
+const correct = `
+  function savedb(){
+var data = {};
+var ood = new aliyun();
+return ood.addOrUpdate(data);
+}`;
+// new test/transformTest/db/db.test.js
+const correct = `
+  function savedbv2(){
+var data = {};
+var o = {};
+data.o = o;
+var ood = new aliyun();
+return ood.addOrUpdate(data);
+}`;
 ```
 
 #### 补充资料
